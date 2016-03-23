@@ -2,7 +2,10 @@
 
 from mnist import MNIST
 import numpy as np
+import pandas
+import sklearn_pandas
 from sklearn import neural_network as nn
+from sklearn.preprocessing import StandardScaler
 from sklearn2pmml import sklearn2pmml
 
 
@@ -17,16 +20,16 @@ def draw_random(truth_array, prediction, test_label, test_data):
 
 def main():
     data = MNIST('./data')
+    col_names = ["x" + str(x) for x in range(784)]
+    # Define a transform function that will be serialized with the model
+    mnist_mapper = sklearn_pandas.DataFrameMapper([(col_names, StandardScaler()), ("digit", None)])
+
     # 60,000 train samples of 28x28 grid, domain 0-255
     mnist_train_data, mnist_train_label = data.load_training()
-    mnist_train_data_norm = np.array([np.array(x)/255. for x in mnist_train_data])
-    # 10,000 test samples of same
-    mnist_test_data, mnist_test_label = data.load_testing()
-    mnist_test_data_norm = np.array([np.array(x)/255. for x in mnist_test_data])
-
-    # Store transforms to be serialized in PMML
-    # used in model training and execution
-    mnist_mapper = None
+    mnist_train_df = pandas.concat((pandas.DataFrame(mnist_train_data, columns=col_names),
+                                    pandas.DataFrame(list(mnist_train_label), columns=["digit"])),
+                                   axis=1)
+    mnist_train_df_norm = mnist_mapper.fit_transform(mnist_train_df)
 
     mlp_config = {'hidden_layer_sizes': (1000,),
                   'activation': 'tanh',
@@ -37,9 +40,16 @@ def main():
                   'verbose': True
                   }
     mnist_classifier = nn.MLPClassifier(**mlp_config)
-    mnist_classifier.fit(X=mnist_train_data_norm, y=mnist_train_label)
+    mnist_classifier.fit(X=mnist_train_df_norm[:, 0:28 * 28], y=mnist_train_df_norm[:, 28 * 28])
 
-    prediction = mnist_classifier.predict_proba(mnist_test_data_norm)
+    # 10,000 test samples
+    mnist_test_data, mnist_test_label = data.load_testing()
+    mnist_test_df = pandas.concat((pandas.DataFrame(mnist_test_data, columns=col_names),
+                                   pandas.DataFrame(list(mnist_test_label), columns=["digit"])),
+                                  axis=1)
+    mnist_test_df_norm = mnist_mapper.fit_transform(mnist_test_df)
+
+    prediction = mnist_classifier.predict_proba(mnist_test_df_norm[:, 0:28 * 28])
     truth_array = [prediction[idx].argmax() == mnist_test_label[idx] for idx in range(len(prediction))]
     accuracy = float(sum(truth_array)) / float(len(truth_array))
     print "out of sample model accuracy [%s]" % accuracy
