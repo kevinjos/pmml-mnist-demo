@@ -1,5 +1,8 @@
 #!/usr/bin/python
 
+import httplib
+import json
+
 from mnist import MNIST
 import numpy as np
 import pandas
@@ -9,7 +12,16 @@ from sklearn.preprocessing import StandardScaler
 from sklearn2pmml import sklearn2pmml
 
 
-def draw_random(truth_array, prediction, test_label, test_data):
+def query_digit(digit):
+    host, port = "localhost", 4567
+    con = httplib.HTTPConnection(host, port)
+    params = json.dumps({"data": digit})
+    con.request("POST", "/digit", params)
+    response = con.getresponse()
+    print "For digit:%s\nReceived prediction response [%s]\n" % (MNIST.display(digit), response.read())
+
+
+def draw_random_misclassification(truth_array, prediction, test_label, test_data):
     """
     Prints the prediction, label and digit for a random misclassified sample
     """
