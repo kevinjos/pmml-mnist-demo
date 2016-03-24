@@ -12,4 +12,4 @@ This demo currently requires a pre-release installation of sklearn2pmml and scik
 
 Once the dependencies are satified, wget the MNIST data
 
-	$ cd train; ./get_data.sh
+	$ ./get_data.sh
